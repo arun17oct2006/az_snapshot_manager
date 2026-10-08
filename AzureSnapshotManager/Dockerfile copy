@@ -1,0 +1,26 @@
+# Build Stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy project files relative to solution root
+COPY ["src/AzureSnapshotManager.Api/AzureSnapshotManager.Api.csproj", "src/AzureSnapshotManager.Api/"]
+COPY ["src/AzureSnapshotManager.Core/AzureSnapshotManager.Core.csproj", "src/AzureSnapshotManager.Core/"]
+COPY ["src/AzureSnapshotManager.Infrastructure/AzureSnapshotManager.Infrastructure.csproj", "src/AzureSnapshotManager.Infrastructure/"]
+
+RUN dotnet restore "src/AzureSnapshotManager.Api/AzureSnapshotManager.Api.csproj"
+
+# Copy everything else and build
+COPY . .
+WORKDIR "/src/src/AzureSnapshotManager.Api"
+RUN dotnet publish -c Release -o /app/publish
+
+# Runtime Stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Koyeb dynamically injects a PORT environment variable, configure Kestrel to listen to it
+ENV ASPNETCORE_URLS=http://+:$PORT
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "AzureSnapshotManager.Api.dll"]

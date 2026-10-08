@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Azure Snapshot Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14171c;
+    --surface: #1c2028;
+    --surface-raised: #21262f;
+    --border: #2a2f3a;
+    --ink: #e8e6e1;
+    --ink-dim: #9098a8;
+    --ink-faint: #5c6472;
+    --gold: #c9a227;
+    --teal: #3fa796;
+    --red: #d1544b;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  a { color: var(--teal); }
+
+  /* ---------- Top subscription bar ---------- */
+  .subbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .subbar-label {
+    font-size: 13px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+
+  .subbar input {
+    flex: 1;
+    max-width: 480px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--ink);
+    padding: 9px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .subbar input:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+
+  .status-chip {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .status-chip.ready { color: var(--teal); border-color: rgba(63,167,150,.4); }
+  .status-chip.error { color: var(--red); border-color: rgba(209,84,75,.4); }
+
+  button {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  button:hover { border-color: var(--ink-faint); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #1a1502;
+  }
+  .btn-primary:hover { background: #d8ae2c; border-color: #d8ae2c; }
+
+  /* ---------- Layout ---------- */
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--ink-dim);
+  }
+  .empty-state p { max-width: 380px; margin: 8px auto 0; font-size: 14px; line-height: 1.6; }
+
+  /* ---------- Stat row ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 20px 22px;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 500;
+    text-align: right;
+  }
+  .stat-value.waste { color: var(--red); }
+  .stat-value.savings { color: var(--gold); }
+
+  /* ---------- Section ---------- */
+  section {
+    margin-bottom: 32px;
+  }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .section-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .section-head .count {
+    color: var(--ink-dim);
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-dim);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th.num, td.num { text-align: right; }
+  td {
+    padding: 11px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  td.num, td.cost { font-family: 'IBM Plex Mono', monospace; }
+  td.cost { color: var(--red); }
+  td.name { color: var(--ink); }
+  td.rg { color: var(--ink-dim); }
+  tr:hover td { background: var(--surface-raised); }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--teal);
+    padding: 0;
+    font-size: 13px;
+    text-decoration: underline;
+  }
+  .link-btn:hover { border: none; }
+
+  /* ---------- Retention rules ---------- */
+  .rule-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .rule-row:last-child { border-bottom: none; }
+  .rule-row .rule-text { flex: 1; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
+  .rule-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .rule-form input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--ink);
+    padding: 8px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 6px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 18px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity .2s ease;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { border-color: rgba(209,84,75,.5); color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="subbar">
+  <span class="subbar-label">Subscription</span>
+  <input id="subInput" class="mono" placeholder="00000000-0000-0000-0000-000000000000" />
+  <span id="subStatus" class="status-chip">not set</span>
+  <button id="runAuditBtn" class="btn-primary" disabled>Run audit</button>
+</div>
+
+<main>
+  <div id="emptyState" class="empty-state">
+    <div style="font-size:14px;color:var(--ink-dim)">No subscription set</div>
+    <p>Enter a subscription ID above and run an audit to see orphaned snapshots and potential savings.</p>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Orphaned snapshots</div>
+        <div class="stat-value" id="statOrphaned">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Daily waste</div>
+        <div class="stat-value waste" id="statDaily">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Monthly savings if cleaned up</div>
+        <div class="stat-value savings" id="statMonthly">—</div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-head">
+        <h2>Findings</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="count" id="findingsCount"></span>
+          <button id="exportBtn">Export CSV</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Snapshot</th>
+            <th>Resource group</th>
+            <th class="num">Size</th>
+            <th class="num">Daily cost</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="findingsBody">
+          <tr><td colspan="5" style="color:var(--ink-faint)">Run an audit to see results.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Retention rules</h2>
+        <span class="count" id="rulesCount"></span>
+      </div>
+      <div id="rulesList" style="background:var(--surface);border:1px solid var(--border);border-radius:6px">
+        <div class="rule-row" style="color:var(--ink-faint)">No rules yet.</div>
+      </div>
+      <form class="rule-form" id="ruleForm">
+        <input id="ruleInput" placeholder="resourceGroup:rg-critical  or  snapshotName:contains:backup-" />
+        <button type="submit">Add rule</button>
+      </form>
+      <div class="hint">Snapshots matching an active rule are excluded from findings and savings totals.</div>
+    </section>
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const subInput = $('subInput');
+const subStatus = $('subStatus');
+const runAuditBtn = $('runAuditBtn');
+const emptyState = $('emptyState');
+const content = $('content');
+
+let subscriptionId = localStorage.getItem('snapmgr:subscriptionId') || '';
+subInput.value = subscriptionId;
+
+function toast(msg, isError) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function guidRegex() {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+}
+
+function setSubscription(id) {
+  subscriptionId = id.trim();
+  localStorage.setItem('snapmgr:subscriptionId', subscriptionId);
+  const valid = guidRegex().test(subscriptionId);
+
+  runAuditBtn.disabled = !valid;
+  subStatus.className = 'status-chip' + (valid ? ' ready' : subscriptionId ? ' error' : '');
+  subStatus.textContent = valid ? 'ready' : subscriptionId ? 'invalid format' : 'not set';
+
+  emptyState.style.display = valid ? 'none' : 'block';
+  content.style.display = valid ? 'block' : 'none';
+
+  if (valid) loadDashboard();
+}
+
+subInput.addEventListener('input', (e) => setSubscription(e.target.value));
+
+// Every call below reads the one subscriptionId set at the top bar —
+// nothing downstream asks for it again.
+async function api(path, opts = {}) {
+  const res = await fetch(`/api/subscriptions/${subscriptionId}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res;
+}
+
+async function loadDashboard() {
+  try {
+    const res = await api('/dashboard/savings');
+    const data = await res.json();
+    $('statOrphaned').textContent = data.totalFlaggedSnapshots ?? 0;
+    $('statDaily').textContent = '—';
+    $('statMonthly').textContent = '$' + Number(data.totalMonthlySavings || 0).toFixed(2);
+  } catch (e) {
+    // No scan yet — leave placeholders, this is expected on first load.
+  }
+  loadRules();
+}
+
+runAuditBtn.addEventListener('click', async () => {
+  runAuditBtn.disabled = true;
+  runAuditBtn.textContent = 'Running…';
+  try {
+    const res = await api('/audit/run', { method: 'POST' });
+    const data = await res.json();
+    renderFindings(data);
+    toast(`Audit complete — ${data.orphanedCount} orphaned snapshot(s) found`);
+  } catch (e) {
+    toast('Audit failed: ' + e.message, true);
+  } finally {
+    runAuditBtn.disabled = false;
+    runAuditBtn.textContent = 'Run audit';
+  }
+});
+
+function renderFindings(result) {
+  $('statOrphaned').textContent = result.orphanedCount ?? 0;
+  $('statDaily').textContent = '$' + Number(result.totalDailyWaste || 0).toFixed(2);
+  $('statMonthly').textContent = '$' + Number(result.totalMonthlyWaste || 0).toFixed(2);
+
+  const rows = (result.groups || []).flatMap(g => g.snapshots || []);
+  $('findingsCount').textContent = rows.length + ' found';
+
+  const body = $('findingsBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" style="color:var(--ink-faint)">No orphaned snapshots found.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map(s => `
+    <tr>
+      <td class="name">${s.name || s.snapshotId}</td>
+      <td class="rg">${s.resourceGroup || '—'}</td>
+      <td class="num mono">${(s.sizeGb ?? 0)} GB</td>
+      <td class="num cost">$${Number(s.dailyCost || 0).toFixed(4)}</td>
+      <td><button class="link-btn" onclick="window.open('https://portal.azure.com/#@/resource/subscriptions/${subscriptionId}/resourceGroups/${s.resourceGroup}/providers/Microsoft.Compute/snapshots/${s.name}/overview','_blank')">Open in portal</button></td>
+    </tr>
+  `).join('');
+}
+
+$('exportBtn').addEventListener('click', () => {
+  window.open(`/api/subscriptions/${subscriptionId}/export/csv`, '_blank');
+});
+
+async function loadRules() {
+  try {
+    const res = await api('/retention-rules');
+    const rules = await res.json();
+    $('rulesCount').textContent = rules.length + (rules.length === 1 ? ' rule' : ' rules');
+
+    const list = $('rulesList');
+    if (!rules.length) {
+      list.innerHTML = '<div class="rule-row" style="color:var(--ink-faint)">No rules yet.</div>';
+      return;
+    }
+    list.innerHTML = rules.map(r => `
+      <div class="rule-row">
+        <span class="rule-text">${r.exclusionRule}</span>
+        <button class="link-btn" onclick="deleteRule('${r.preferenceId}')">Remove</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    // ignore — dashboard load already reported issues if any
+  }
+}
+
+$('ruleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = $('ruleInput');
+  const rule = input.value.trim();
+  if (!rule) return;
+  try {
+    await api('/retention-rules', {
+      method: 'POST',
+      body: JSON.stringify({ exclusionRule: rule })
+    });
+    input.value = '';
+    toast('Rule added');
+    loadRules();
+  } catch (err) {
+    toast('Could not add rule: ' + err.message, true);
+  }
+});
+
+async function deleteRule(id) {
+  try {
+    await api(`/retention-rules/${id}`, { method: 'DELETE' });
+    toast('Rule removed');
+    loadRules();
+  } catch (err) {
+    toast('Could not remove rule: ' + err.message, true);
+  }
+}
+
+// Init
+setSubscription(subscriptionId);
+</script>
+
+</body>
+</html>
